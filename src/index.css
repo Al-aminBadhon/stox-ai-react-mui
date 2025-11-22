@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* StockSense AI - Financial Platform Design System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* Core Brand Colors - Financial Blue Theme */
+    --background: 217 100% 97%;
+    --foreground: 226 31% 20%;
+    
+    /* Financial Blue Primary */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 217 91% 70%;
+    --primary-dark: 217 91% 50%;
+    
+    /* Success/Growth Green */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 71% 55%;
+    
+    /* Warning/Alert Orange */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Danger/Loss Red */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Neutral Grays */
+    --card: 0 0% 100%;
+    --card-foreground: 226 31% 20%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 20% 65%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 226 31% 30%;
+    
+    /* UI Elements */
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 226 31% 20%;
+    
+    /* Financial Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 55%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    
+    /* Shadows - Material Design Inspired */
+    --shadow-sm: 0 1px 2px 0 hsl(226 31% 20% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(226 31% 20% / 0.1), 0 2px 4px -1px hsl(226 31% 20% / 0.06);
+    --shadow-lg: 0 10px 15px -3px hsl(226 31% 20% / 0.1), 0 4px 6px -2px hsl(226 31% 20% / 0.05);
+    --shadow-xl: 0 20px 25px -5px hsl(226 31% 20% / 0.1), 0 10px 10px -5px hsl(226 31% 20% / 0.04);
+    --shadow-financial: 0 8px 32px hsl(217 91% 60% / 0.12);
+    
+    /* Animations */
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark theme for financial platform */
+    --background: 226 31% 8%;
+    --foreground: 210 40% 98%;
+    
+    --card: 226 31% 12%;
+    --card-foreground: 210 40% 98%;
+    
+    --primary: 217 91% 65%;
+    --primary-foreground: 226 31% 8%;
+    --primary-light: 217 91% 75%;
+    --primary-dark: 217 91% 55%;
+    
+    --success: 142 71% 50%;
+    --success-foreground: 226 31% 8%;
+    
+    --muted: 226 31% 15%;
+    --muted-foreground: 215 20% 70%;
+    --secondary: 226 31% 15%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --border: 226 31% 20%;
+    --input: 226 31% 20%;
+    --ring: 217 91% 65%;
+    --accent: 217 91% 65%;
+    --accent-foreground: 226 31% 8%;
+    
+    --popover: 226 31% 12%;
+    --popover-foreground: 210 40% 98%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 65%), hsl(217 91% 75%));
+    --gradient-card: linear-gradient(145deg, hsl(226 31% 12%), hsl(226 31% 15%));
+    --shadow-financial: 0 8px 32px hsl(217 91% 65% / 0.2);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  
+  /* Financial Platform Specific Styles */
+  .financial-card {
+    @apply bg-card border border-border shadow-md rounded-[var(--radius)] backdrop-blur-sm;
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-smooth);
+  }
+  
+  .financial-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .shadow-financial {
+    box-shadow: var(--shadow-financial);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+  
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+}
