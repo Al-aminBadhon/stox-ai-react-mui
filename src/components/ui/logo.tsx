@@ -6,17 +6,21 @@ interface LogoProps {
   size?: "sm" | "md" | "lg";
 }
 
-export const Logo = ({ className = "", showText = true, size = "md" }: LogoProps) => {
+export const Logo = ({
+  className = "",
+  showText = true,
+  size = "md",
+}: LogoProps) => {
   const sizeClasses = {
     sm: "text-lg",
     md: "text-2xl",
-    lg: "text-3xl"
+    lg: "text-3xl",
   };
 
   const iconSizes = {
     sm: 20,
     md: 28,
-    lg: 36
+    lg: 36,
   };
 
   return (
@@ -26,7 +30,7 @@ export const Logo = ({ className = "", showText = true, size = "md" }: LogoProps
       </div>
       {showText && (
         <span className={`font-bold text-foreground ${sizeClasses[size]}`}>
-          StockSense AI
+          StoX AI
         </span>
       )}
     </div>
