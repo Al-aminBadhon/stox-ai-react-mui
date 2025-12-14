@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import api from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,25 +16,79 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/ui/logo";
 import { TrendingUp, Mail, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { json } from "stream/consumers";
+
+// const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5000/api";
 
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // const handleLogin = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+
+  //   // Simulate API call
+  //   setTimeout(() => {
+  //     toast({
+  //       title: "Welcome back!",
+  //       description: "Successfully logged in to StockSense AI",
+  //     });
+  //     navigate("/home");
+  //     setIsLoading(false);
+  //   }, 1500);
+  // };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const response = await api.post("/login", {
+        email,
+        password,
+      });
+
+      // console.log(response.data.user);
+      // Example: token or user info from backend
+      const { token, user } = response.data;
+
       toast({
         title: "Welcome back!",
         description: "Successfully logged in to StockSense AI",
       });
+
+      const userData = {
+        id: response.data.user.id,
+        email: response.data.user.email,
+        name: response.data.user.name,
+        token: response.data.token,
+      };
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
       navigate("/home");
+    } catch (error) {
+      console.log(error);
+      let errorMessage = "Login failed. Please try again.";
+
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || errorMessage;
+        console.log(errorMessage);
+      }
+
+      toast({
+        title: "Login Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -113,6 +169,8 @@ const Login = () => {
                         type="email"
                         placeholder="your@email.com"
                         className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary focus:ring-primary/20"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         required
                       />
                     </div>
@@ -129,6 +187,8 @@ const Login = () => {
                         type="password"
                         placeholder="••••••••"
                         className="pl-10 h-12 bg-background/50 border-border/50 focus:border-primary focus:ring-primary/20"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                       />
                     </div>
