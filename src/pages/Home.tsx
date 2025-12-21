@@ -61,13 +61,29 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { parse } from "path";
+import api from "@/lib/axios";
+import { CompanyResponse } from "@/types/company";
+import { AnalystPredictions } from "@/types/analystInfo";
 
 const Home = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTicker, setSearchTicker] = useState("");
-  const [selectedStock, setSelectedStock] = useState<any>(null);
+  const [selectedStock, setSelectedStock] = useState<CompanyResponse | null>(
+    null
+  );
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
+
+  const [news, setNews] = useState<any>(null);
+  const [predictions, setPredictions] = useState<AnalystPredictions | null>(
+    null
+  );
+  // const [investors, setInvestors] = useState<any>(null);
+  // const [guidelines, setGuidelines] = useState<any>(null);
+
+  const [activeTab, setActiveTab] = useState<string>("news");
+  const [loadingTab, setLoadingTab] = useState<string | null>(null);
+  console.log("Active Tab:", activeTab);
   const [searchHistory] = useState([
     { ticker: "AAPL", timestamp: "2 hours ago", name: "Apple Inc." },
     { ticker: "GOOGL", timestamp: "1 day ago", name: "Alphabet Inc." },
@@ -75,69 +91,111 @@ const Home = () => {
     { ticker: "TSLA", timestamp: "3 days ago", name: "Tesla Inc." },
     { ticker: "AMZN", timestamp: "1 week ago", name: "Amazon.com Inc." },
   ]);
-  const storedUser = localStorage.getItem("user");
+  // const storedUser = localStorage.getItem("user");
 
-  console.log("data stored", localStorage.getItem("user"));
   const [user, setUser] = useState<{
-    id: string;
     email: string;
     name: string;
+    mobile: string;
+    isVerified: number;
   } | null>(null);
 
   useEffect(() => {
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-    }
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get("/profile");
+        const user = res.data.user;
+
+        if (user.isVerified === 0) {
+          navigate("/login");
+        }
+
+        setUser(user); // data from backend
+      } catch (error) {
+        console.error("Profile fetch failed", error);
+        localStorage.clear();
+        navigate("/login");
+      } finally {
+      }
+    };
+
+    fetchProfile();
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchTicker.trim()) return;
 
-    // Mock stock data
-    const mockData = {
-      ticker: searchTicker.toUpperCase(),
-      name: "Apple Inc.",
-      industry: "Technology Hardware",
-      founded: "1976",
-      ceo: "Tim Cook",
-      description:
-        "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide.",
+    try {
+      if (
+        searchTicker.trim().toUpperCase() ===
+        selectedStock?.ticker.toUpperCase()
+      )
+        return toast({
+          title: "Stock Analysis already loaded",
+          description: `Loaded data for ${searchTicker.toUpperCase()}`,
+        });
+      const res = await api.get<CompanyResponse>(
+        `research/${searchTicker.toUpperCase()}`
+      );
+      // initialSearchData = res.data;
+      setSelectedStock(res.data);
+      console.log("Predictions Data:", predictions);
 
-      // Additional enhanced data
-      marketCap: "4T",
-      revenue: "383.3B",
-      employees: "164,000",
-      headquarters: "Cupertino, CA",
-      dividendYield: "0.55%",
-      peRatio: "28.5",
-      weekRange: "132 - 199",
-      beta: "1.28",
-      esgScore: "A-",
-
-      businessSegments: [
-        { name: "iPhone", revenueShare: "52%", icon: "Smartphone" },
-        { name: "Services", revenueShare: "25%", icon: "Laptop" },
-        { name: "Mac & iPad", revenueShare: "15%", icon: "Tablet" },
-        { name: "Wearables", revenueShare: "8%", icon: "Watch" },
-      ],
-
-      performance: {
-        ytdReturn: "+18%",
-        revenueGrowth: "+2.1%",
-        ceoTenure: "Since 2011",
-        companyAge: "48 years",
-      },
-    };
-
-    setSelectedStock(mockData);
+      setPredictions(null);
+      setActiveTab("news");
+      console.log("Initial Search Data:", res.data);
+    } catch (err) {
+      console.error("Search failed", err);
+      localStorage.clear();
+      navigate("/login");
+    } finally {
+    }
     toast({
       title: "Stock Analysis Complete",
       description: `Loaded data for ${searchTicker.toUpperCase()}`,
     });
   };
 
+  const handleTabChange = async (tab: string) => {
+    if (!searchTicker.trim()) return;
+
+    setActiveTab(tab);
+
+    if (
+      (tab === "news" && news) ||
+      (tab === "predictions" && predictions)
+      // || tab === "investors" && investors || tab === "guidelines" && guidelines
+    ) {
+      console.log("Predictions Data:", predictions);
+      return;
+    }
+    try {
+      setLoadingTab(tab);
+      if (tab === "predictions") {
+        const res = await api.get<AnalystPredictions>(
+          `/research/analyst/${searchTicker.toUpperCase()}`
+        );
+        setPredictions(res.data);
+        console.log("Predictions Data:", predictions);
+        console.log("response Data:", res.data);
+      }
+      if (tab === "investors") {
+        // api.get<InvestorInfo>(`/research/investors/${searchTicker.toUpperCase()}`).then((res) => {
+        //   setInvestors(res.data);
+        // });
+      }
+      if (tab === "guidelines") {
+        // api.get<guidelinesInfo>(`/research/guidelines/${searchTicker.toUpperCase()}`).then((res) => {
+        //   setInvestors(res.data);
+        // });
+      }
+    } catch (error) {
+      console.log("Tab dat fetch error:", error);
+    } finally {
+      setLoadingTab(null);
+    }
+  };
   const handleLogout = () => {
     toast({
       title: "Logged out",
@@ -229,7 +287,7 @@ const Home = () => {
                   {selectedStock.ticker}
                 </Badge>
                 <h1 className="text-xl font-semibold text-foreground">
-                  {selectedStock.name}
+                  {selectedStock.companyInfo.name}
                 </h1>
               </>
             ) : (
@@ -247,7 +305,7 @@ const Home = () => {
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback className="bg-gradient-primary text-white font-semibold">
-                    {user.name ? "BD" : "GT"}
+                    {user?.name ? "BD" : "GT"}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -305,15 +363,15 @@ const Home = () => {
                           Industry
                         </p>
                         <p className="font-medium text-foreground">
-                          {selectedStock.industry}
+                          {selectedStock.companyInfo.industry}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Consumer Electronics
+                          {selectedStock.companyInfo.customers}
                         </p>
                       </div>
                     </div>
 
-                    {/* Founded */}
+                    {/* Founded content*/}
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-success/10 rounded-lg">
                         <Calendar className="w-5 h-5 text-success" />
@@ -321,10 +379,10 @@ const Home = () => {
                       <div>
                         <p className="text-sm text-muted-foreground">Founded</p>
                         <p className="font-medium text-foreground">
-                          {selectedStock.founded}
+                          {selectedStock.companyInfo.founded}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          48 years ago
+                          Old Company
                         </p>
                       </div>
                     </div>
@@ -337,10 +395,10 @@ const Home = () => {
                       <div>
                         <p className="text-sm text-muted-foreground">CEO</p>
                         <p className="font-medium text-foreground">
-                          {selectedStock.ceo}
+                          {selectedStock.companyInfo.ceo}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Since 2011
+                          Since 2011 -demo
                         </p>
                       </div>
                     </div>
@@ -354,7 +412,9 @@ const Home = () => {
                         <p className="text-sm text-muted-foreground">
                           Market Cap
                         </p>
-                        <p className="font-medium text-foreground">$2.8T</p>
+                        <p className="font-medium text-foreground">
+                          {selectedStock.companyInfo.marketCap}
+                        </p>
                         <p className="text-xs text-success mt-1">+18% YTD</p>
                       </div>
                     </div>
@@ -362,10 +422,9 @@ const Home = () => {
 
                   <Separator className="my-4" />
 
-                  {/* Second Row - Additional Metrics */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-                    {/* Revenue */}
-                    <div className="flex items-center space-x-3">
+                    {/* 1. Revenue - Takes 1/4 of total width (First half of the half) */}
+                    <div className="md:col-span-1 flex items-center space-x-3">
                       <div className="p-2 bg-blue-500/10 rounded-lg">
                         <DollarSign className="w-5 h-5 text-blue-500" />
                       </div>
@@ -377,8 +436,9 @@ const Home = () => {
                         <p className="text-xs text-success mt-1">+2.1% YoY</p>
                       </div>
                     </div>
-                    {/* P/E Ratio */}
-                    <div className="flex items-center space-x-3">
+
+                    {/* 2. P/E Ratio - Takes 1/4 of total width (Second half of the half) */}
+                    <div className="md:col-span-1 flex items-center space-x-3">
                       <div className="p-2 bg-indigo-500/10 rounded-lg">
                         <BarChart3 className="w-5 h-5 text-indigo-500" />
                       </div>
@@ -386,166 +446,46 @@ const Home = () => {
                         <p className="text-sm text-muted-foreground">
                           P/E Ratio
                         </p>
-                        <p className="font-medium text-foreground">28.5</p>
+                        <p className="font-medium text-foreground">
+                          {selectedStock.companyInfo.peRatio}
+                        </p>
                         <p className="text-xs text-warning mt-1">
                           Sector: 24.1
                         </p>
                       </div>
                     </div>
 
-                    {/* 52 Week Range */}
-                    <div className="flex items-center space-x-3">
+                    {/* 3. Products/52W Range - Takes 2/4 (the entire remaining half) */}
+                    <div className="md:col-span-2 flex items-center space-x-3">
                       <div className="p-2 bg-rose-500/10 rounded-lg">
                         <Activity className="w-5 h-5 text-rose-500" />
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">
-                          52W Range
+                          Products
                         </p>
-                        <p className="font-medium text-foreground">
-                          $132 - $199
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          +23% from low
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Employees */}
-                    {/* <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-green-500/10 rounded-lg">
-                        <Users className="w-5 h-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Employees
-                        </p>
-                        <p className="font-medium text-foreground">164,000</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Global workforce
-                        </p>
-                      </div>
-                    </div> */}
-
-                    {/* Headquarters */}
-                    {/* <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-orange-500/10 rounded-lg">
-                        <MapPin className="w-5 h-5 text-orange-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Headquarters
-                        </p>
-                        <p className="font-medium text-foreground">
-                          Cupertino, CA
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          United States
-                        </p>
-                      </div>
-                    </div> */}
-
-                    {/* Dividend Yield */}
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-teal-500/10 rounded-lg">
-                        <Percent className="w-5 h-5 text-teal-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Dividend Yield
-                        </p>
-                        <p className="font-medium text-foreground">0.55%</p>
-                        <p className="text-xs text-success mt-1">
-                          $0.96 per share
-                        </p>
+                        {/* flex wrapper to display dynamic products horizontally or neatly */}
+                        <ul className="flex flex-wrap gap-2 list-none">
+                          {selectedStock?.companyInfo?.products?.map(
+                            (product, index) => (
+                              <li
+                                key={index}
+                                className="text-xs bg-muted px-2 py-0.5 rounded border border-border/50"
+                              >
+                                {product}
+                              </li>
+                            )
+                          )}
+                        </ul>
                       </div>
                     </div>
                   </div>
 
-                  <Separator className="my-4" />
-
-                  {/* Third Row - Key Performance Indicators */}
-                  {/*<div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-                    {/* Beta */}
-                  {/* <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-cyan-500/10 rounded-lg">
-                        <Gauge className="w-5 h-5 text-cyan-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Beta</p>
-                        <p className="font-medium text-foreground">1.28</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          More volatile
-                        </p>
-                      </div>
-                    </div> */}
-
-                  {/* ESG Score */}
-                  {/* <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-emerald-500/10 rounded-lg">
-                        <Leaf className="w-5 h-5 text-emerald-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          ESG Score
-                        </p>
-                        <p className="font-medium text-foreground">A-</p>
-                        <p className="text-xs text-success mt-1">
-                          Industry leader
-                        </p>
-                      </div>
-                    </div> 
-                  </div>*/}
-
-                  <Separator className="my-4" />
-
-                  {/* Business Segments */}
-                  {/* <div className="mt-4">
-                    <h4 className="font-semibold text-foreground mb-3">
-                      Business Segments
-                    </h4>
-                    <div className="grid grid-cols-4 gap-2">
-                      <div className="flex flex-col items-center p-2 bg-muted/30 rounded-lg text-center">
-                        <Smartphone className="w-4 h-4 text-blue-500 mb-1" />
-                        <span className="text-xs font-medium">iPhone</span>
-                        <span className="text-xs text-muted-foreground">
-                          52%
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col items-center p-2 bg-muted/30 rounded-lg text-center">
-                        <Laptop className="w-4 h-4 text-green-500 mb-1" />
-                        <span className="text-xs font-medium">Services</span>
-                        <span className="text-xs text-muted-foreground">
-                          25%
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col items-center p-2 bg-muted/30 rounded-lg text-center">
-                        <Tablet className="w-4 h-4 text-purple-500 mb-1" />
-                        <span className="text-xs font-medium">Mac & iPad</span>
-                        <span className="text-xs text-muted-foreground">
-                          15%
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col items-center p-2 bg-muted/30 rounded-lg text-center">
-                        <Watch className="w-4 h-4 text-orange-500 mb-1" />
-                        <span className="text-xs font-medium">Wearables</span>
-                        <span className="text-xs text-muted-foreground">
-                          8%
-                        </span>
-                      </div>
-                    </div>
-                  </div> */}
-
-                  {/* <Separator className="my-4" /> */}
-
                   {/* Enhanced Description */}
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                  <div className="space-y-3 mt-4">
+                    {/* <p className="text-sm text-muted-foreground leading-relaxed">
                       {selectedStock.description}
-                    </p>
+                    </p> */}
                     <div className="flex items-start space-x-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
                       <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
                       <div>
@@ -553,10 +493,7 @@ const Home = () => {
                           Investment Highlights
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Apple maintains strong brand loyalty, ecosystem
-                          lock-in, and growing services revenue. The company
-                          continues to innovate in AR/VR and has significant
-                          cash reserves for strategic investments.
+                          {selectedStock.companyInfo.summary}
                         </p>
                       </div>
                     </div>
@@ -567,7 +504,11 @@ const Home = () => {
               {/* Analysis Tabs */}
               <Card className="financial-card">
                 <CardContent className="p-0">
-                  <Tabs defaultValue="news" className="w-full">
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={handleTabChange}
+                    className="w-full"
+                  >
                     <div className="border-b border-border p-6 pb-0">
                       <TabsList className="grid w-full grid-cols-4 bg-muted/30">
                         <TabsTrigger
@@ -607,7 +548,7 @@ const Home = () => {
                         <Card className="financial-card border-0">
                           <CardContent className="p-6">
                             <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-lg font-semibold text-foreground">
+                              <h3 className="text-md font-semibold text-foreground">
                                 Market Sentiment Summary
                               </h3>
                               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
@@ -622,7 +563,11 @@ const Home = () => {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                               <div className="text-center p-3 bg-success/5 rounded-lg border border-success/20">
                                 <div className="text-2xl font-bold text-success">
-                                  72%
+                                  {
+                                    selectedStock.news.sentimentAnalysis
+                                      .bullishOutOf100
+                                  }
+                                  %
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   Bullish
@@ -630,7 +575,11 @@ const Home = () => {
                               </div>
                               <div className="text-center p-3 bg-warning/5 rounded-lg border border-warning/20">
                                 <div className="text-2xl font-bold text-warning">
-                                  18%
+                                  {
+                                    selectedStock.news.sentimentAnalysis
+                                      .neutralOutOf100
+                                  }
+                                  %
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   Neutral
@@ -638,7 +587,11 @@ const Home = () => {
                               </div>
                               <div className="text-center p-3 bg-destructive/5 rounded-lg border border-destructive/20">
                                 <div className="text-2xl font-bold text-destructive">
-                                  10%
+                                  {
+                                    selectedStock.news.sentimentAnalysis
+                                      .bearishOutOf100
+                                  }
+                                  %
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   Bearish
@@ -646,7 +599,11 @@ const Home = () => {
                               </div>
                               <div className="text-center p-3 bg-primary/5 rounded-lg border border-primary/20">
                                 <div className="text-2xl font-bold text-primary">
-                                  4.2/5
+                                  {
+                                    selectedStock.news.sentimentAnalysis
+                                      .sentimentScoreOutOf5
+                                  }
+                                  /5
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                   Sentiment Score
@@ -654,7 +611,7 @@ const Home = () => {
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between text-sm">
+                            {/* <div className="flex items-center justify-between text-sm">
                               <div className="flex items-center space-x-2">
                                 <TrendingUp className="w-4 h-4 text-success" />
                                 <span className="text-foreground">
@@ -671,7 +628,7 @@ const Home = () => {
                                   China regulations, supply chain, tariff news
                                 </span>
                               </div>
-                            </div>
+                            </div> */}
                           </CardContent>
                         </Card>
 
@@ -679,701 +636,489 @@ const Home = () => {
                           Latest Market News & Analysis
                         </h3>
 
-                        <div className="space-y-4">
-                          {/* Breaking News */}
-                          <div
-                            className="p-4 border-2 border-warning/30 rounded-lg bg-warning/5 hover:border-warning/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.bloomberg.com/news/articles/2024-01-15/apple-iphone-sales-china-resilient-demand",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-warning text-warning-foreground text-xs font-medium rounded-full">
-                                    BREAKING
-                                  </span>
-                                  <span className="text-xs text-warning font-medium">
-                                    Market Moving
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Apple Defies China Slowdown With Resilient
-                                  iPhone Demand
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Apple's iPhone sales in China show unexpected
-                                  strength despite economic headwinds, with Q4
-                                  shipments growing 12% year-over-year. Analysts
-                                  attribute this to successful product
-                                  segmentation and brand loyalty.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>Bloomberg</span>
+                        {selectedStock.news.recentNews.map(
+                          (newsItem, index) => (
+                            <div
+                              className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
+                              onClick={() =>
+                                window.open(`${newsItem.url}`, "_blank")
+                              }
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <span
+                                      className={`${
+                                        newsItem.score == "positive"
+                                          ? "px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full"
+                                          : "px-2 py-1 bg-red-500 text-white text-xs font-medium rounded-full"
+                                      }`}
+                                    >
+                                      {newsItem.sectorImpact.toUpperCase()}
                                     </span>
-                                    <span>•</span>
-                                    <span>45 minutes ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-success">
-                                      <TrendingUp className="w-3 h-3" />
-                                      <span>Very Positive</span>
+                                    <span
+                                      className={
+                                        newsItem.score == "positive"
+                                          ? "text-xs text-green-500 font-medium"
+                                          : "text-xs text-red-500 font-medium"
+                                      }
+                                    >
+                                      {newsItem.source}
                                     </span>
                                   </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                                  <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                                    {newsItem.title}
+                                  </h4>
+                                  <p className="text-sm text-muted-foreground mb-3">
+                                    {newsItem.summary}
+                                  </p>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center text-xs text-muted-foreground space-x-4">
+                                      <span className="flex items-center space-x-1">
+                                        <Newspaper className="w-3 h-3" />
+                                        <span>{newsItem.source}</span>
+                                      </span>
+                                      <span>•</span>
+                                      <span>recent news</span>
+                                      <span>•</span>
+                                      <span
+                                        className={`${
+                                          newsItem.score == "positive"
+                                            ? "flex items-center space-x-1 text-success"
+                                            : "flex items-center space-x-1 text-destructive"
+                                        }`}
+                                      >
+                                        {newsItem.score == "positive" ? (
+                                          <TrendingUp className="w-3 h-3" />
+                                        ) : (
+                                          <TrendingDown className="w-3 h-3" />
+                                        )}
 
-                          {/* Major News */}
-                          <div
-                            className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.reuters.com/technology/apple-vision-pro-early-reviews-praise-potential-question-price-2024-01-16/",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                                    TECH
-                                  </span>
-                                  <span className="text-xs text-primary font-medium">
-                                    Product Launch
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Apple Vision Pro Receives Rave Reviews, But
-                                  Price Remains Concern
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Early reviews praise the revolutionary spatial
-                                  computing experience of Apple's Vision Pro,
-                                  though the $3,499 price point raises questions
-                                  about mainstream adoption potential in the
-                                  competitive AR/VR market.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>Reuters</span>
-                                    </span>
-                                    <span>•</span>
-                                    <span>2 hours ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-warning">
-                                      <Minus className="w-3 h-3" />
-                                      <span>Mixed</span>
-                                    </span>
+                                        <span>{newsItem.score}</span>
+                                      </span>
+                                    </div>
+                                    <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                   </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                                 </div>
                               </div>
                             </div>
-                          </div>
-
-                          {/* Financial News */}
-                          <div
-                            className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.wsj.com/finance/stocks/apple-stock-aapl-buyback-dividend-increase-2024-3a5c8f1d",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                                    DIVIDEND
-                                  </span>
-                                  <span className="text-xs text-green-500 font-medium">
-                                    Shareholder Return
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Apple Considers Major Share Buyback Increase
-                                  Amid Strong Cash Flow
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Sources indicate Apple's board is discussing a
-                                  potential 15% increase in its share repurchase
-                                  program and a dividend hike, leveraging the
-                                  company's robust cash position of over $180
-                                  billion.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>Wall Street Journal</span>
-                                    </span>
-                                    <span>•</span>
-                                    <span>4 hours ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-success">
-                                      <TrendingUp className="w-3 h-3" />
-                                      <span>Positive</span>
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Regulatory News */}
-                          <div
-                            className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.cnbc.com/2024/01/15/apple-app-store-changes-eu-digital-markets-act.html",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-blue-500 text-white text-xs font-medium rounded-full">
-                                    REGULATORY
-                                  </span>
-                                  <span className="text-xs text-blue-500 font-medium">
-                                    Legal Update
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Apple Announces Major App Store Changes in
-                                  Response to EU Regulations
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  In compliance with the EU's Digital Markets
-                                  Act, Apple will allow alternative app stores
-                                  and payment systems on iOS devices in Europe,
-                                  potentially impacting the company's lucrative
-                                  services revenue stream.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>CNBC</span>
-                                    </span>
-                                    <span>•</span>
-                                    <span>6 hours ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-destructive">
-                                      <TrendingDown className="w-3 h-3" />
-                                      <span>Negative</span>
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Analyst Report */}
-                          <div
-                            className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.marketwatch.com/story/apple-stock-gets-upgraded-at-morgan-stanley-heres-why-2024-01-15",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full">
-                                    ANALYST
-                                  </span>
-                                  <span className="text-xs text-purple-500 font-medium">
-                                    Rating Change
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Morgan Stanley Upgrades Apple to Overweight,
-                                  Sees 25% Upside
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Morgan Stanley raises Apple rating citing AI
-                                  integration potential and services growth
-                                  acceleration. Analyst Katy Huberty sets $220
-                                  price target, highlighting upcoming AI
-                                  features in iOS 18.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>MarketWatch</span>
-                                    </span>
-                                    <span>•</span>
-                                    <span>8 hours ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-success">
-                                      <TrendingUp className="w-3 h-3" />
-                                      <span>Very Positive</span>
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Industry News */}
-                          <div
-                            className="p-4 border border-border/50 rounded-lg hover:border-primary/50 transition-smooth cursor-pointer group"
-                            onClick={() =>
-                              window.open(
-                                "https://www.ft.com/content/8a7c3e9a-4a5b-4e3d-9c8f-1a2b3c4d5e6f",
-                                "_blank"
-                              )
-                            }
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <span className="px-2 py-1 bg-orange-500 text-white text-xs font-medium rounded-full">
-                                    INDUSTRY
-                                  </span>
-                                  <span className="text-xs text-orange-500 font-medium">
-                                    Supply Chain
-                                  </span>
-                                </div>
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  Apple Diversifies Supply Chain With Major
-                                  Vietnam Manufacturing Expansion
-                                </h4>
-                                <p className="text-sm text-muted-foreground mb-3">
-                                  Apple accelerates its China-plus-one strategy
-                                  with a $1 billion investment in Vietnamese
-                                  manufacturing facilities for AirPods and Apple
-                                  Watch production, reducing reliance on Chinese
-                                  suppliers.
-                                </p>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center text-xs text-muted-foreground space-x-4">
-                                    <span className="flex items-center space-x-1">
-                                      <Newspaper className="w-3 h-3" />
-                                      <span>Financial Times</span>
-                                    </span>
-                                    <span>•</span>
-                                    <span>1 day ago</span>
-                                    <span>•</span>
-                                    <span className="flex items-center space-x-1 text-success">
-                                      <TrendingUp className="w-3 h-3" />
-                                      <span>Positive</span>
-                                    </span>
-                                  </div>
-                                  <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* News Summary Stats */}
-                        <Card className="financial-card border-0 mt-6">
-                          <CardContent className="p-4">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                              <div>
-                                <div className="text-lg font-bold text-success">
-                                  12
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Positive News
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-bold text-warning">
-                                  3
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Neutral News
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-bold text-destructive">
-                                  2
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Negative News
-                                </div>
-                              </div>
-                              <div>
-                                <div className="text-lg font-bold text-primary">
-                                  17
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Total Stories
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                          )
+                        )}
                       </TabsContent>
 
                       <TabsContent
                         value="predictions"
                         className="space-y-4 mt-0"
                       >
-                        <Card className="financial-card">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                              <h3 className="text-lg font-semibold text-foreground">
-                                Analyst Forecasts & Market Sentiment
-                              </h3>
-                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                                <TrendingUp className="w-4 h-4" />
-                                <span>Real-time Analysis</span>
-                              </div>
+                        {loadingTab === "predictions" ? (
+                          <div className="flex items-center justify-center h-48">
+                            <div className="text-center space-y-3">
+                              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+                              <p className="text-sm text-muted-foreground">
+                                Loading predictions...
+                              </p>
                             </div>
-
-                            {/* Key Metrics Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                              <Card className="border-border/50 bg-background/50">
-                                <CardContent className="p-4 text-center">
-                                  <div className="text-2xl font-bold text-success mb-1">
-                                    $310.5
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Average Target
-                                  </div>
-                                  <div className="text-xs text-success flex items-center justify-center mt-1">
-                                    <TrendingUp className="w-3 h-3 mr-1" />
-                                    +2.3% from current
-                                  </div>
-                                </CardContent>
-                              </Card>
-
-                              <Card className="border-border/50 bg-background/50">
-                                <CardContent className="p-4 text-center">
-                                  <div className="text-2xl font-bold text-primary mb-1">
-                                    Strong Buy
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Consensus Rating
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    42 analysts
-                                  </div>
-                                </CardContent>
-                              </Card>
-
-                              <Card className="border-border/50 bg-background/50">
-                                <CardContent className="p-4 text-center">
-                                  <div className="text-2xl font-bold text-warning mb-1">
-                                    15.2%
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Upside Potential
-                                  </div>
-                                  <div className="text-xs text-warning flex items-center justify-center mt-1">
-                                    <Target className="w-3 h-3 mr-1" />
-                                    High confidence
-                                  </div>
-                                </CardContent>
-                              </Card>
-
-                              <Card className="border-border/50 bg-background/50">
-                                <CardContent className="p-4 text-center">
-                                  <div className="text-2xl font-bold text-foreground mb-1">
-                                    $280.70
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Current Price
-                                  </div>
-                                  <div className="text-xs text-success flex items-center justify-center mt-1">
-                                    <ArrowUp className="w-3 h-3 mr-1" />
-                                    +1.8% today
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </div>
-
-                            <Separator className="my-6" />
-
-                            {/* Analyst Recommendations Breakdown */}
-                            <div className="mb-6">
-                              <h4 className="font-semibold text-foreground mb-4">
-                                Analyst Recommendations
-                              </h4>
-                              <div className="space-y-3">
-                                {/* Strong Buy */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-success rounded-full"></div>
-                                    <span className="text-sm font-medium">
-                                      Strong Buy
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-24 bg-muted rounded-full h-2">
-                                      <div
-                                        className="bg-success h-2 rounded-full"
-                                        style={{ width: "65%" }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground w-8">
-                                      65%
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Buy */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-primary rounded-full"></div>
-                                    <span className="text-sm font-medium">
-                                      Buy
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-24 bg-muted rounded-full h-2">
-                                      <div
-                                        className="bg-primary h-2 rounded-full"
-                                        style={{ width: "25%" }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground w-8">
-                                      25%
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Hold */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-warning rounded-full"></div>
-                                    <span className="text-sm font-medium">
-                                      Hold
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-24 bg-muted rounded-full h-2">
-                                      <div
-                                        className="bg-warning h-2 rounded-full"
-                                        style={{ width: "8%" }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground w-8">
-                                      8%
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Sell */}
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-3 h-3 bg-destructive rounded-full"></div>
-                                    <span className="text-sm font-medium">
-                                      Sell
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <div className="w-24 bg-muted rounded-full h-2">
-                                      <div
-                                        className="bg-destructive h-2 rounded-full"
-                                        style={{ width: "2%" }}
-                                      ></div>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground w-8">
-                                      2%
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <Separator className="my-6" />
-
-                            {/* Price Targets & Market Sentiment */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              {/* Price Target Range */}
-                              <div>
-                                <h4 className="font-semibold text-foreground mb-4">
-                                  Price Target Range
-                                </h4>
-                                <div className="space-y-4">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">
-                                      Low Target
-                                    </span>
-                                    <span className="text-sm font-medium text-destructive">
-                                      $150.00
-                                    </span>
-                                  </div>
-
-                                  <div className="relative pt-2">
-                                    <div className="w-full bg-muted rounded-full h-2">
-                                      <div className="bg-gradient-to-r from-destructive via-warning to-success h-2 rounded-full"></div>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                      <span>$150</span>
-                                      <span className="text-foreground font-medium">
-                                        Current: $162.30
-                                      </span>
-                                      <span>$210</span>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">
-                                      High Target
-                                    </span>
-                                    <span className="text-sm font-medium text-success">
-                                      $210.00
-                                    </span>
-                                  </div>
+                          </div>
+                        ) : !predictions ? (
+                          <div className="flex items-center justify-center h-48">
+                            <p className="text-sm text-muted-foreground">
+                              No predictions available
+                            </p>
+                          </div>
+                        ) : (
+                          <Card className="financial-card">
+                            <CardContent className="p-6">
+                              <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-semibold text-foreground">
+                                  Analyst Forecasts & Market Sentiment
+                                </h3>
+                                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                  <TrendingUp className="w-4 h-4" />
+                                  <span>Real-time Analysis</span>
                                 </div>
                               </div>
 
-                              {/* Market Sentiment */}
-                              <div>
-                                <h4 className="font-semibold text-foreground mb-4">
-                                  Market Sentiment
-                                </h4>
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between p-3 bg-success/5 rounded-lg border border-success/20">
-                                    <div className="flex items-center space-x-2">
-                                      <TrendingUp className="w-4 h-4 text-success" />
-                                      <span className="text-sm font-medium">
-                                        Bullish
-                                      </span>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground">
-                                      72%
-                                    </span>
-                                  </div>
+                              <div className="space-y-6">
+                                {/* Top Row: 2x2 Metrics + Recommendations */}
+                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                                  {/* Left: 2x2 Metrics Grid */}
+                                  <div className="lg:col-span-2">
+                                    <div className="grid grid-cols-2 gap-4">
+                                      {/* Average Target */}
+                                      <Card className="border-border/50 bg-background/50">
+                                        <CardContent className="p-5 text-center">
+                                          <div className="text-2xl font-bold text-success mb-1">
+                                            $
+                                            {
+                                              predictions?.analystInfo
+                                                ?.avgTargetPrice
+                                            }
+                                          </div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Average Target
+                                          </div>
+                                          <div className="text-xs text-success flex items-center justify-center mt-2">
+                                            <TrendingUp className="w-3 h-3 mr-1" />
+                                            +2.3% from current
+                                          </div>
+                                        </CardContent>
+                                      </Card>
 
-                                  <div className="flex items-center justify-between p-3 bg-warning/5 rounded-lg border border-warning/20">
-                                    <div className="flex items-center space-x-2">
-                                      <Minus className="w-4 h-4 text-warning" />
-                                      <span className="text-sm font-medium">
-                                        Neutral
-                                      </span>
-                                    </div>
-                                    <span className="text-sm text-muted-foreground">
-                                      18%
-                                    </span>
-                                  </div>
+                                      {/* Consensus Rating */}
+                                      <Card className="border-border/50 bg-background/50">
+                                        <CardContent className="p-5 text-center">
+                                          <div className="text-2xl font-bold text-primary mb-1">
+                                            {predictions?.analystInfo?.rating.toUpperCase()}
+                                          </div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Consensus Rating
+                                          </div>
+                                          <div className="text-xs text-muted-foreground mt-2">
+                                            42 analysts
+                                          </div>
+                                        </CardContent>
+                                      </Card>
 
-                                  <div className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg border border-destructive/20">
-                                    <div className="flex items-center space-x-2">
-                                      <TrendingDown className="w-4 h-4 text-destructive" />
-                                      <span className="text-sm font-medium">
-                                        Bearish
-                                      </span>
+                                      {/* Upside Potential */}
+                                      <Card className="border-border/50 bg-background/50">
+                                        <CardContent className="p-5 text-center">
+                                          <div className="text-2xl font-bold text-warning mb-1">
+                                            {
+                                              predictions?.analystInfo
+                                                ?.upsidePotential
+                                            }
+                                          </div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Upside Potential
+                                          </div>
+                                          <div className="text-xs text-warning flex items-center justify-center mt-2">
+                                            <Target className="w-3 h-3 mr-1" />
+                                            High confidence
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+
+                                      {/* Current Price */}
+                                      <Card className="border-border/50 bg-background/50">
+                                        <CardContent className="p-5 text-center">
+                                          <div className="text-2xl font-bold text-foreground mb-1">
+                                            {
+                                              predictions?.analystInfo
+                                                ?.currentPrice
+                                            }
+                                          </div>
+                                          <div className="text-sm text-muted-foreground">
+                                            Current Price
+                                          </div>
+                                          <div className="text-xs text-success flex items-center justify-center mt-2">
+                                            <ArrowUp className="w-3 h-3 mr-1" />
+                                            +1.8% today
+                                          </div>
+                                        </CardContent>
+                                      </Card>
                                     </div>
-                                    <span className="text-sm text-muted-foreground">
-                                      10%
-                                    </span>
+                                  </div>
+                                  {/* market sentiment */}
+                                  <div className="lg:col-span-1">
+                                    <Card className="border-border/50 bg-background/50">
+                                      <CardContent className="p-5">
+                                        <h4 className="font-semibold text-foreground mb-4">
+                                          Market Sentiment
+                                        </h4>
+                                        <div className="space-y-3">
+                                          <div className="flex items-center justify-between p-3 bg-success/5 rounded-lg border border-success/20">
+                                            <div className="flex items-center space-x-2">
+                                              <TrendingUp className="w-4 h-4 text-success" />
+                                              <span className="text-sm font-medium">
+                                                Bullish
+                                              </span>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">
+                                              72%
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center justify-between p-3 bg-warning/5 rounded-lg border border-warning/20">
+                                            <div className="flex items-center space-x-2">
+                                              <Minus className="w-4 h-4 text-warning" />
+                                              <span className="text-sm font-medium">
+                                                Neutral
+                                              </span>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">
+                                              18%
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg border border-destructive/20">
+                                            <div className="flex items-center space-x-2">
+                                              <TrendingDown className="w-4 h-4 text-destructive" />
+                                              <span className="text-sm font-medium">
+                                                Bearish
+                                              </span>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">
+                                              10%
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                  {/* Left: Price Target Range */}
+                                  <div className="lg:col-span-1">
+                                    <Card className="border-border/50 bg-background/50">
+                                      <CardContent className="p-5">
+                                        <h4 className="font-semibold text-foreground mb-4">
+                                          Price Target Range
+                                        </h4>
+                                        <div className="space-y-4">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">
+                                              Low Target
+                                            </span>
+                                            <span className="text-sm font-medium text-destructive">
+                                              {
+                                                predictions?.analystInfo
+                                                  ?.lowestTargetPrice
+                                              }
+                                            </span>
+                                          </div>
+
+                                          <div className="relative pt-2">
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                              <div className="bg-gradient-to-r from-destructive via-warning to-success h-2 rounded-full"></div>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                              <span>$150</span>
+                                              <span className="text-foreground font-medium">
+                                                Current:{" "}
+                                                {
+                                                  predictions?.analystInfo
+                                                    ?.currentPrice
+                                                }
+                                              </span>
+                                              <span>$210</span>
+                                            </div>
+                                          </div>
+
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">
+                                              High Target
+                                            </span>
+                                            <span className="text-sm font-medium text-success">
+                                              {
+                                                predictions?.analystInfo
+                                                  ?.highestTargetPrice
+                                              }
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
                                   </div>
                                 </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                  {/* Analyst Recommendations */}
+                                  <div className="lg:col-span-1">
+                                    <Card className="border-border/50 bg-background/50 h-full">
+                                      <CardContent className="p-5">
+                                        <h4 className="font-semibold text-foreground mb-4">
+                                          Analyst Recommendations
+                                        </h4>
+                                        <div className="space-y-4">
+                                          {/* Strong Buy */}
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="w-3 h-3 bg-success rounded-full"></div>
+                                                <span className="text-sm font-medium">
+                                                  Strong Buy
+                                                </span>
+                                              </div>
+                                              <span className="text-sm font-semibold">
+                                                {
+                                                  predictions?.analystInfo
+                                                    ?.analystRecommendationBreakdown
+                                                    ?.strongBuyOutOf100
+                                                }
+                                                %
+                                              </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                              <div
+                                                className="bg-success h-2 rounded-full"
+                                                style={{ width: "65%" }}
+                                              ></div>
+                                            </div>
+                                          </div>
+
+                                          {/* Buy */}
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="w-3 h-3 bg-primary rounded-full"></div>
+                                                <span className="text-sm font-medium">
+                                                  Buy
+                                                </span>
+                                              </div>
+                                              <span className="text-sm font-semibold">
+                                                {
+                                                  predictions?.analystInfo
+                                                    ?.analystRecommendationBreakdown
+                                                    ?.buyOutOf100
+                                                }
+                                                %
+                                              </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                              <div
+                                                className="bg-primary h-2 rounded-full"
+                                                style={{ width: "25%" }}
+                                              ></div>
+                                            </div>
+                                          </div>
+
+                                          {/* Hold */}
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="w-3 h-3 bg-warning rounded-full"></div>
+                                                <span className="text-sm font-medium">
+                                                  Hold
+                                                </span>
+                                              </div>
+                                              <span className="text-sm font-semibold">
+                                                {
+                                                  predictions?.analystInfo
+                                                    ?.analystRecommendationBreakdown
+                                                    ?.holdOutOf100
+                                                }
+                                                %
+                                              </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                              <div
+                                                className="bg-warning h-2 rounded-full"
+                                                style={{ width: "8%" }}
+                                              ></div>
+                                            </div>
+                                          </div>
+
+                                          {/* Sell */}
+                                          <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="w-3 h-3 bg-destructive rounded-full"></div>
+                                                <span className="text-sm font-medium">
+                                                  Sell
+                                                </span>
+                                              </div>
+                                              <span className="text-sm font-semibold">
+                                                {
+                                                  predictions?.analystInfo
+                                                    ?.analystRecommendationBreakdown
+                                                    ?.sellOutOf100
+                                                }
+                                                %
+                                              </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-2">
+                                              <div
+                                                className="bg-destructive h-2 rounded-full"
+                                                style={{ width: "2%" }}
+                                              ></div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Summary */}
+                                        <div className="mt-6 pt-4 border-t border-border/50">
+                                          <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">
+                                              Total Analysts
+                                            </span>
+                                            <span className="font-semibold">
+                                              {
+                                                predictions?.analystInfo
+                                                  ?.analystRecommendationBreakdown
+                                                  ?.totalAnalysts
+                                              }
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center justify-between text-sm mt-2">
+                                            <span className="text-muted-foreground">
+                                              Bullish Consensus
+                                            </span>
+                                            <span className="font-semibold text-success">
+                                              90%
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                  <div className="lg:col-span-2">
+                                    {/* Recent Analyst Actions */}
+                                    <div>
+                                      <h4 className="font-semibold text-foreground mb-4">
+                                        Recent Analyst Actions
+                                      </h4>
+                                      <div className="space-y-3">
+                                        {predictions?.analystInfo?.recentAnalystActions.map(
+                                          (action) => (
+                                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                                              <div>
+                                                <p className="font-medium text-foreground">
+                                                  {action.analystName}
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                  {action.action} • Target $
+                                                  {action.targetPrice}
+                                                </p>
+                                              </div>
+                                              <div className="text-right">
+                                                <p className="text-sm font-medium text-success">
+                                                  +5.2% upside
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                  {action.date}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Market Sentiment - spans 1 column (same width as recommendations) */}
+                                </div>
                               </div>
-                            </div>
 
-                            <Separator className="my-6" />
+                              <Separator className="my-6" />
 
-                            {/* Recent Analyst Actions */}
-                            <div>
-                              <h4 className="font-semibold text-foreground mb-4">
-                                Recent Analyst Actions
-                              </h4>
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                              {/* Key Insights */}
+                              <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                                <div className="flex items-start space-x-3">
+                                  <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
                                   <div>
                                     <p className="font-medium text-foreground">
-                                      Goldman Sachs
+                                      Key Insight
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Maintained Buy • Target $195
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-medium text-success">
-                                      +5.2% upside
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      2 days ago
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                                  <div>
-                                    <p className="font-medium text-foreground">
-                                      Morgan Stanley
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Upgraded to Overweight • Target $188
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-medium text-success">
-                                      +3.1% upside
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      1 week ago
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                                  <div>
-                                    <p className="font-medium text-foreground">
-                                      JP Morgan
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Maintained Neutral • Target $165
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-sm font-medium text-warning">
-                                      +1.7% upside
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      2 weeks ago
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Strong buy consensus driven by expected
+                                      iPhone 16 super-cycle and growing services
+                                      revenue. Most analysts see 10-20% upside
+                                      potential over next 12 months.
                                     </p>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-
-                            {/* Key Insights */}
-                            <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                              <div className="flex items-start space-x-3">
-                                <Lightbulb className="w-5 h-5 text-primary mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-foreground">
-                                    Key Insight
-                                  </p>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    Strong buy consensus driven by expected
-                                    iPhone 16 super-cycle and growing services
-                                    revenue. Most analysts see 10-20% upside
-                                    potential over next 12 months.
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+                        )}
                       </TabsContent>
 
                       <TabsContent value="investors" className="space-y-4 mt-0">

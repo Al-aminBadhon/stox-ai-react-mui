@@ -52,7 +52,6 @@ const Login = () => {
         password,
       });
 
-      // console.log(response.data.user);
       // Example: token or user info from backend
       const { token, user } = response.data;
 
