@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ReactMarkdown from "react-markdown";
 import {
   Card,
   CardContent,
@@ -64,6 +65,7 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/axios";
 import { CompanyResponse } from "@/types/company";
 import { AnalystPredictions } from "@/types/analystInfo";
+import { GuidelineInfoResponse } from "@/types/guidelineInfo";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -79,7 +81,9 @@ const Home = () => {
     null
   );
   // const [investors, setInvestors] = useState<any>(null);
-  // const [guidelines, setGuidelines] = useState<any>(null);
+  const [guidelines, setGuidelines] = useState<GuidelineInfoResponse | null>(
+    null
+  );
 
   const [activeTab, setActiveTab] = useState<string>("news");
   const [loadingTab, setLoadingTab] = useState<string | null>(null);
@@ -143,8 +147,8 @@ const Home = () => {
       console.log("Predictions Data:", predictions);
 
       setPredictions(null);
+      setGuidelines(null);
       setActiveTab("news");
-      console.log("Initial Search Data:", res.data);
     } catch (err) {
       console.error("Search failed", err);
       localStorage.clear();
@@ -161,11 +165,13 @@ const Home = () => {
     if (!searchTicker.trim()) return;
 
     setActiveTab(tab);
-
+    console.log("before checking if tab ", guidelines?.report);
     if (
       (tab === "news" && news) ||
-      (tab === "predictions" && predictions)
-      // || tab === "investors" && investors || tab === "guidelines" && guidelines
+      (tab === "predictions" && predictions) ||
+      (tab === "guidelines" && guidelines)
+
+      // || tab === "investors" && investors
     ) {
       console.log("Predictions Data:", predictions);
       return;
@@ -186,9 +192,13 @@ const Home = () => {
         // });
       }
       if (tab === "guidelines") {
-        // api.get<guidelinesInfo>(`/research/guidelines/${searchTicker.toUpperCase()}`).then((res) => {
-        //   setInvestors(res.data);
-        // });
+        console.log("Guideline api hitting");
+        const res = await api.get(
+          `/research/guideline/${searchTicker.toUpperCase()}`
+        );
+        setTimeout(() => {
+          setGuidelines(res.data.guideLineInfo);
+        }, 3000);
       }
     } catch (error) {
       console.log("Tab dat fetch error:", error);
@@ -201,9 +211,23 @@ const Home = () => {
       title: "Logged out",
       description: "You have been successfully logged out",
     });
-    navigate("/");
+    localStorage.clear();
+    navigate("/login");
   };
+  const downloadPdf = async () => {
+    const response = await fetch("/download-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // body: JSON.stringify({ reportData: reportData }), // Pass report data string
+    });
 
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Research Report {{selectedStock?.ticker}}.pdf";
+    a.click();
+  };
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left Sidebar */}
@@ -1770,134 +1794,209 @@ const Home = () => {
                           value="guidelines"
                           className="space-y-4 mt-0"
                         >
-                          <Card className="financial-card">
-                            <CardContent className="p-6">
-                              <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-lg font-semibold text-foreground">
-                                  AI Investment Insights
-                                </h3>
-                                <div className="flex items-center space-x-2 text-sm text-primary">
-                                  <Brain className="w-4 h-4" />
-                                  <span>AI Analysis in Progress</span>
-                                </div>
-                              </div>
-                              {/* Download Button - Added at the top */}
-                              <div className="flex justify-end mb-6">
-                                <Button
-                                  variant="outline"
-                                  className="bg-gradient-to-r from-primary/10 to-blue-500/10 border-primary/20 text-primary hover:from-primary/20 hover:to-blue-500/20 hover:border-primary/30 transition-all duration-300 group"
-                                  disabled
-                                >
-                                  <Download className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-                                  Download Full Analysis Report
-                                  <span className="ml-2 px-2 py-1 text-xs bg-primary/20 rounded-full">
-                                    Soon
-                                  </span>
-                                </Button>
-                              </div>
-
-                              {/* Loading Animation */}
-                              <div className="flex flex-col items-center justify-center py-12 space-y-6">
-                                {/* Animated AI Icon */}
-                                <div className="relative">
-                                  <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center">
-                                    <Brain className="w-8 h-8 text-white" />
+                          {!guidelines?.report ? (
+                            <Card className="financial-card">
+                              <CardContent className="p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                  <h3 className="text-lg font-semibold text-foreground">
+                                    AI Investment Insights
+                                  </h3>
+                                  <div className="flex items-center space-x-2 text-sm text-primary">
+                                    <Brain className="w-4 h-4" />
+                                    <span>AI Analysis in Progress</span>
                                   </div>
-                                  <div className="absolute inset-0 border-4 border-primary/30 rounded-full animate-ping"></div>
-                                  <div className="absolute inset-0 border-2 border-primary/20 rounded-full animate-pulse"></div>
                                 </div>
-
-                                {/* Progress Indicator */}
-                                <div className="w-full max-w-md space-y-4">
-                                  <div className="flex justify-between text-sm text-muted-foreground">
-                                    <span>Analysis Progress</span>
-                                    <span className="text-primary font-medium">
-                                      Initializing...
+                                {/* Download Button - Added at the top */}
+                                <div className="flex justify-end mb-6">
+                                  <Button
+                                    variant="outline"
+                                    className="bg-gradient-to-r from-primary/10 to-blue-500/10 border-primary/20 text-primary hover:from-primary/20 hover:to-blue-500/20 hover:border-primary/30 transition-all duration-300 group"
+                                    disabled
+                                  >
+                                    <Download className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                                    Download Full Analysis Report
+                                    <span className="ml-2 px-2 py-1 text-xs bg-primary/20 rounded-full">
+                                      Soon
                                     </span>
+                                  </Button>
+                                </div>
+
+                                {/* Loading Animation */}
+                                <div className="flex flex-col items-center justify-center py-12 space-y-6">
+                                  {/* Animated AI Icon */}
+                                  <div className="relative">
+                                    <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center">
+                                      <Brain className="w-8 h-8 text-white" />
+                                    </div>
+                                    <div className="absolute inset-0 border-4 border-primary/30 rounded-full animate-ping"></div>
+                                    <div className="absolute inset-0 border-2 border-primary/20 rounded-full animate-pulse"></div>
                                   </div>
-                                  <div className="w-full bg-muted rounded-full h-2">
-                                    <div
-                                      className="bg-gradient-primary h-2 rounded-full transition-all duration-1000 ease-out"
-                                      style={{ width: "25%" }}
-                                    ></div>
+
+                                  {/* Progress Indicator */}
+                                  <div className="w-full max-w-md space-y-4">
+                                    <div className="flex justify-between text-sm text-muted-foreground">
+                                      <span>Analysis Progress</span>
+                                      <span className="text-primary font-medium">
+                                        Initializing...
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-muted rounded-full h-2">
+                                      <div
+                                        className="bg-gradient-primary h-2 rounded-full transition-all duration-1000 ease-out"
+                                        style={{ width: "25%" }}
+                                      ></div>
+                                    </div>
+                                  </div>
+
+                                  {/* Status Messages */}
+                                  <div className="text-center space-y-3">
+                                    <h4 className="font-semibold text-foreground">
+                                      Deep Analysis in Progress
+                                    </h4>
+                                    <p className="text-muted-foreground max-w-md leading-relaxed">
+                                      Our AI agents are conducting comprehensive
+                                      analysis of Apple's industry position,
+                                      market trends, and competitive landscape
+                                      across multiple data sources.
+                                    </p>
+                                  </div>
+
+                                  {/* Estimated Time */}
+                                  <div className="flex items-center space-x-3 p-4 bg-warning/5 rounded-lg border border-warning/20">
+                                    <Clock className="w-5 h-5 text-warning" />
+                                    <div>
+                                      <p className="font-medium text-foreground">
+                                        Estimated time remaining: ~30 seconds
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        Processing real-time market data and
+                                        industry insights
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Analysis Steps */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg">
+                                    <div className="flex items-center space-x-3 p-3 bg-success/5 rounded-lg border border-success/20">
+                                      <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                                      <span className="text-sm text-foreground">
+                                        Market Analysis
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-3 p-3 bg-success/5 rounded-lg border border-success/20">
+                                      <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
+                                      <span className="text-sm text-foreground">
+                                        Competitor Research
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                      <span className="text-sm text-foreground">
+                                        Financial Modeling
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                      <span className="text-sm text-foreground">
+                                        Risk Assessment
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
 
-                                {/* Status Messages */}
-                                <div className="text-center space-y-3">
-                                  <h4 className="font-semibold text-foreground">
-                                    Deep Analysis in Progress
-                                  </h4>
-                                  <p className="text-muted-foreground max-w-md leading-relaxed">
-                                    Our AI agents are conducting comprehensive
-                                    analysis of Apple's industry position,
-                                    market trends, and competitive landscape
-                                    across multiple data sources.
-                                  </p>
-                                </div>
+                                <Separator className="my-4" />
 
-                                {/* Estimated Time */}
-                                <div className="flex items-center space-x-3 p-4 bg-warning/5 rounded-lg border border-warning/20">
-                                  <Clock className="w-5 h-5 text-warning" />
+                                {/* Note */}
+                                <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-lg">
+                                  <Info className="w-5 h-5 text-muted-foreground mt-0.5" />
                                   <div>
                                     <p className="font-medium text-foreground">
-                                      Estimated time remaining: ~30 seconds
+                                      Why does this take time?
                                     </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Processing real-time market data and
-                                      industry insights
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Our AI analyzes thousands of data points
+                                      including market trends, financial
+                                      reports, news sentiment, and technical
+                                      indicators to provide comprehensive
+                                      investment insights.
                                     </p>
                                   </div>
                                 </div>
+                              </CardContent>
+                            </Card>
+                          ) : (
+                            <Card className="financial-card">
+                              <CardContent className="p-6">
+                                <div className="flex items-center justify-between mb-6">
+                                  <h3 className="text-lg font-semibold text-foreground">
+                                    AI Investment Insights
+                                  </h3>
+                                </div>
+                                {/* Download Button - Added at the top */}
+                                <div className="flex justify-end mb-6">
+                                  <Button
+                                    variant="outline"
+                                    className="bg-gradient-to-r from-primary/10 to-blue-500/10 border-primary/20 text-primary hover:from-primary/20 hover:to-blue-500/20 hover:border-primary/30 transition-all duration-300 group"
+                                  >
+                                    <Download className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                                    Download Report
+                                  </Button>
+                                </div>
 
-                                {/* Analysis Steps */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg">
-                                  <div className="flex items-center space-x-3 p-3 bg-success/5 rounded-lg border border-success/20">
-                                    <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-foreground">
-                                      Market Analysis
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-3 p-3 bg-success/5 rounded-lg border border-success/20">
-                                    <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-foreground">
-                                      Competitor Research
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-foreground">
-                                      Financial Modeling
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                    <span className="text-sm text-foreground">
-                                      Risk Assessment
-                                    </span>
+                                {/* Note */}
+                                <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-lg">
+                                  <Info className="w-10 h-7 text-red-900-foreground mt-0" />
+                                  <div>
+                                    <p className="font-medium text-warning mb-6">
+                                      This is AI analysis based on current
+                                      market, always make your own decissions.
+                                    </p>
+                                    <p className="text-sm text-foreground mt-1">
+                                      <ReactMarkdown
+                                        components={{
+                                          // Use fragments around {children} to satisfy TypeScript
+                                          p: ({ node, children, ...props }) => (
+                                            <p
+                                              className="text-justify leading-relaxed mb-4"
+                                              {...props}
+                                            >
+                                              <>{children}</>
+                                            </p>
+                                          ),
+                                          strong: ({
+                                            node,
+                                            children,
+                                            ...props
+                                          }) => (
+                                            <strong
+                                              className="block font-bold text-black-900 mt-3 mb-0"
+                                              {...props}
+                                            >
+                                              <>{children}</>
+                                            </strong>
+                                          ),
+                                          li: ({
+                                            node,
+                                            children,
+                                            ...props
+                                          }) => (
+                                            <li
+                                              className="text-justify mb-2 ml-4 list-disc"
+                                              {...props}
+                                            >
+                                              <>{children}</>
+                                            </li>
+                                          ),
+                                        }}
+                                      >
+                                        {guidelines?.report}
+                                      </ReactMarkdown>
+                                    </p>
                                   </div>
                                 </div>
-                              </div>
-
-                              <Separator className="my-4" />
-
-                              {/* Note */}
-                              <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-lg">
-                                <Info className="w-5 h-5 text-muted-foreground mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-foreground">
-                                    Why does this take time?
-                                  </p>
-                                  <p className="text-sm text-muted-foreground mt-1">
-                                    Our AI analyzes thousands of data points
-                                    including market trends, financial reports,
-                                    news sentiment, and technical indicators to
-                                    provide comprehensive investment insights.
-                                  </p>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
+                              </CardContent>
+                            </Card>
+                          )}
                         </TabsContent>
                       </TabsContent>
                     </div>
