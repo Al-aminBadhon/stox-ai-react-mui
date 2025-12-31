@@ -14,7 +14,7 @@ const api = axios.create({
 // Add request interceptor for logging
 api.interceptors.request.use(
   (config) => {
-    console.log('🔄 Making API Request:', {
+    console.log('Making API Request:', {
       url: config.url,
       method: config.method,
       data: config.data
@@ -22,7 +22,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
-    console.error('❌ Request Error:', error);
+    console.error('Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -30,14 +30,14 @@ api.interceptors.request.use(
 // Add response interceptor for logging
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Response:', {
+    console.log('API Response:', {
       status: response.status,
       data: response.data
     });
     return response;
   },
   (error) => {
-    console.error('💥 API Error:', {
+    console.error('API Error:', {
       message: error.message,
       status: error.response?.status,
       data: error.response?.data
